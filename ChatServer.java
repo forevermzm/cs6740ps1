@@ -4,7 +4,7 @@ import java.util.*;
 
 public class ChatServer {
     private DatagramSocket socket;
-    private List<GreetedClient> greetedClients = new ArrayList<GreetedClient>();
+    private Set<GreetedClient> greetedClients = new HashSet<GreetedClient>();
 
     public ChatServer(int port){
         try {
@@ -21,12 +21,13 @@ public class ChatServer {
             DatagramPacket packet = new DatagramPacket(buf, buf.length);
             socket.receive(packet);
             String packetMessage = new String(packet.getData());
-            System.out.println("PacketMessage: " + packetMessage);
+            // System.out.println("PacketMessage: " + packetMessage + " from: " + packet.getPort());
             if (packetMessage == null) {
                 continue;
             } else if (isGreetingMessage(packetMessage)){
                 GreetedClient greetedClient = new GreetedClient(packet);
                 greetedClients.add(greetedClient);
+                // System.out.println("HashSet size: " + greetedClients.size());
             } else if (isMessage(packetMessage)){
                 sendIncomingMessage(packet);
             }
@@ -78,8 +79,29 @@ public class ChatServer {
             port = packet.getPort();
         }
 
+        @Override
+        public boolean equals(Object obj) 
+        {
+            if (obj == null) return false;
+            if (obj instanceof GreetedClient) {
+                GreetedClient anotherClient = (GreetedClient) obj;
+                if ( this.address.equals(anotherClient.getAddress()) && this.port == anotherClient.getPort() ) 
+                    return true;
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + address.hashCode();
+            result = prime * result + (new Integer(port).hashCode());
+            return result;
+       }
+
         public DatagramPacket generateINCOMINGPacket(byte[] message){
-            System.out.println("Preparing to send " + (new String(message)));
+            // System.out.println("Preparing to send " + (new String(message)));
             return new DatagramPacket(message, message.length, address, port);
         }
 
