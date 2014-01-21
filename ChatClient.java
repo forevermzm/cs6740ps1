@@ -13,12 +13,6 @@ public class ChatClient extends Thread{
         this.portNumber = portNumber;
     }
 
-    public ChatClient(int clientPort, InetAddress address, int portNumber) throws Exception{
-        this.socket = new DatagramSocket(clientPort);
-        this.address = address;
-        this.portNumber = portNumber;
-    }
-
     private synchronized void sendMessage(String message) throws Exception{
         // System.out.println(message);
         byte[] data = message.getBytes();
@@ -74,7 +68,7 @@ class ReceivingThread extends Thread {
         }
 
         public static void main(String[] args){
-            if (args.length != 3) {
+            if (args.length != 2) {
                 System.err.println(
                     "Usage: java ChatClient <host name> <port number>");
                 System.exit(1);
@@ -83,7 +77,7 @@ class ReceivingThread extends Thread {
                 InetAddress address = InetAddress.getByName(args[0]);
                 int portNumber = Integer.parseInt(args[1]);
 
-                ChatClient chatClient = new ChatClient(Integer.parseInt(args[2]), address, portNumber);
+                ChatClient chatClient = new ChatClient(address, portNumber);
                 new ReceivingThread(chatClient).start();
                 chatClient.start();
             } catch (UnknownHostException e){
