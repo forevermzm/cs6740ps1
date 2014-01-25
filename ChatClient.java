@@ -1,6 +1,11 @@
 import java.io.*;
 import java.net.*;
 
+/**
+ * This class is the client side of the project. It is able to send out messages to and receive
+ * message from Server. It sends out two kinds of messages: GREETING message for registering in
+ * Server and MESSAGE which is user input.
+ */
 public class ChatClient extends Thread {
     private DatagramSocket socket;
     private InetAddress address;
@@ -13,12 +18,18 @@ public class ChatClient extends Thread {
         this.portNumber = portNumber;
     }
 
-    private synchronized void sendMessage(String message) throws Exception {
-        // System.out.println(message);
-        byte[] data = message.getBytes();
-        DatagramPacket packet = new DatagramPacket (data, data.length, address, portNumber);
-        socket.send(packet);
-        // notify();
+    /**
+     * This method sends out a message to Server.
+     * @param  message   message contents.
+     */
+    private synchronized void sendMessage(String message){
+        try {
+            byte[] data = message.getBytes();
+            DatagramPacket packet = new DatagramPacket (data, data.length, address, portNumber);
+            socket.send(packet);
+        } catch (IOException e){
+            e.printStackTrace();
+        }
     }
 
     private void sendMessage() throws Exception {
@@ -28,18 +39,20 @@ public class ChatClient extends Thread {
         }
     }
 
+    /**
+     * This method handles the action of receiving message. Since the receive method will 
+     * lock the socket until it receives the packet, I set a timeout so that the client 
+     * can periodly check if it needs to send out a message to server.
+     */
     public synchronized void getMessage() {
         try {
-            socket.setSoTimeout(1000);
+            socket.setSoTimeout(5);
             byte[] buf = new byte[1024];
             DatagramPacket packet = new DatagramPacket(buf, buf.length);
-            // System.out.println("I am here");
             socket.receive(packet);
-            // System.out.println("It is reaching me here.");
             System.out.println(new String(packet.getData()));
         } catch (SocketTimeoutException e) {
-            // System.out.println("It's timed out.");
-            // e.printStackTrace();
+            
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -51,7 +64,6 @@ public class ChatClient extends Thread {
             sendMessage("GREETING message");
 
             while (true) {
-                // System.out.println("Send Message: ");
                 sendMessage();
             }
         } catch (Exception e) {
@@ -81,6 +93,10 @@ public class ChatClient extends Thread {
 
 }
 
+/**
+ * This thread handles the receiving process. It will keep checking if there is a incoming
+ * packet from Server. If so, it will print out the message to console.
+ */
 class ReceivingThread extends Thread {
     private ChatClient chatClient;
 

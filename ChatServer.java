@@ -2,43 +2,46 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 
+/**
+ * This is a ChatServer uses the UDP protocol to talk to ChatClient. Once the client sends the GREETING message, the server will register the client into the greeted clients list. When the server receives a message from one of the greeted clients, it broadcast the message to all register clients.
+ */
 public class ChatServer {
     private DatagramSocket socket;
+    // The HashSet is used to keep track of all registered clients.
     private Set<GreetedClient> greetedClients = new HashSet<GreetedClient>();
 
     public ChatServer(int port) {
         try {
             socket = new DatagramSocket(port);
-        } catch ( Exception ex ) {
+        } catch ( IOException ex ) {
             System.out.println("Problem creating socket.");
         }
     }
 
-    public void start() throws Exception {
-        System.out.println("Server Initialized...");
-        while (true) {
-            byte[] buf = new byte[1024];
-            DatagramPacket packet = new DatagramPacket(buf, buf.length);
+    /**
+     * This method handles all incoming packet to the specific socket. This method
+     * and {@link #sendIncomingMessage(DatagramPacket packet) sendIncomingMessage}
+     * is synchronized because send had receive should not run at the same time.
+     * @return DatagramPacket
+     */
+    public synchronized DatagramPacket receivePacket() {
+        byte[] buf = new byte[1024];
+        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+        try {
             socket.receive(packet);
-            String packetMessage = new String(packet.getData());
-            System.out.println("PacketMessage: " + packetMessage + " from: " + packet.getPort());
-            if (packetMessage == null) {
-                continue;
-            } else {
-                Thread.sleep(10000);
-                GreetedClient greetedClient = new GreetedClient(packet);
-                if (isGreetingMessage(packetMessage)) {
-                    greetedClients.add(greetedClient);
-                    // System.out.println("HashSet size: " + greetedClients.size());
-                } else if (isMessage(packetMessage)) {
-                    if (greetedClients.contains(greetedClient))
-                        sendIncomingMessage(packet);
-                }
-            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            return packet;
         }
     }
 
-    private void sendIncomingMessage(DatagramPacket packet) {
+    /**
+     * This method takes in the DatagramPakcet from one of the registered clients 
+     * and broadcasts to all register clients.
+     * @param packet Packet contains MESSAGE.
+     */
+    public synchronized void sendIncomingMessage(DatagramPacket packet) {
         String ip = packet.getAddress().getHostAddress();
         String port = Integer.toString(packet.getPort());
         String message = new String(packet.getData());
@@ -54,27 +57,27 @@ public class ChatServer {
         }
     }
 
+    public void addGreetedClient(DatagramPacket packet) {
+        greetedClients.add(new GreetedClient(packet));
+    }
+
+    public boolean containsGreetedClient(DatagramPacket packet) {
+        return greetedClients.contains(new GreetedClient(packet));
+    }
+
     private boolean isGreetingMessage(String packetMessage) {
-        return packetMessage.contains("GREETING");
+        return packetMessage.startsWith("GREETING");
     }
 
     private boolean isMessage(String packetMessage) {
-        return packetMessage.contains("MESSAGE");
+        return packetMessage.startsWith("MESSAGE");
     }
 
-    public static void main(String[] args) throws Exception {
-        if (args.length != 1) {
-            System.err.println(
-                "Usage: java ChatServer <port number>");
-            System.exit(1);
-        }
-
-        int port = Integer.parseInt(args[0]);
-        ChatServer chatServer = new ChatServer(port);
-        chatServer.start();
-    }
-
-    private class GreetedClient {
+    /**
+     * This class is the encapsulation of the registered client's information, 
+     * includes InetAddress and port number. 
+     */
+    public class GreetedClient {
         private InetAddress address;
         private int port;
 
@@ -104,7 +107,6 @@ public class ChatServer {
         }
 
         public DatagramPacket generateINCOMINGPacket(byte[] message) {
-            // System.out.println("Preparing to send " + (new String(message)));
             return new DatagramPacket(message, message.length, address, port);
         }
 
@@ -114,6 +116,36 @@ public class ChatServer {
 
         public int getPort() {
             return port;
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        if (args.length != 1) {
+            System.err.println(
+                "Usage: java ChatServer <port number>");
+            System.exit(1);
+        }
+
+        int port = Integer.parseInt(args[0]);
+        ChatServer chatServer = new ChatServer(port);
+
+        System.out.println("Server Initialized...");
+        while (true) {
+            DatagramPacket packet = chatServer.receivePacket();
+            String packetMessage = new String(packet.getData());
+            // System.out.println("PacketMessage: " + packetMessage + " from: " + packet.getPort());
+
+            // Ignore null messages.
+            if (packetMessage == null) {
+                continue;
+            } else {
+                if (chatServer.isGreetingMessage(packetMessage)) {
+                    chatServer.addGreetedClient(packet);
+                } else if (chatServer.isMessage(packetMessage)) {
+                    if (chatServer.containsGreetedClient(packet))
+                        chatServer.sendIncomingMessage(packet);
+                }
+            }
         }
     }
 }
